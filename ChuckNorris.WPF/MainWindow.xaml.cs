@@ -31,75 +31,66 @@ namespace ChuckNorris.WPF
         }
 
         #region Вывести категории шуток
-        private void CompleteCategories()
+        private async void CompleteCategories()
         {
-            Task.Factory.StartNew(() =>
-            {
-                string response = GetResponse("https://matchilling-chuck-norris-jokes-v1.p.rapidapi.com/jokes/categories");
-                categories = JsonConvert.DeserializeObject<List<string>>(response);
-                Dispatcher.Invoke((Action)delegate
-                {
-                    categoriesListBox.ItemsSource = categories;
-                });
-            });
-        }
-        #endregion
-
-        #region Вывести рандомные шутки
-        private void ShowRandomJokes()
-        {
-            jokesCount = int.Parse(jokesCountTextBox.Text);
-
-            Task.Factory.StartNew(() =>
-            {
-                string response;
-
-                for (int i = 0; i < jokesCount; i++)
-                {
-                    response = GetResponse("https://matchilling-chuck-norris-jokes-v1.p.rapidapi.com/jokes/random");
-                    if (response.Length > 0)
-                    {
-                        joke = JsonConvert.DeserializeObject<Result>(response);
-                        Dispatcher.Invoke((Action)delegate
-                        {
-                            richTextBox.AppendText($"{i + 1}) {joke.Value}\n");
-                        });
-                    }
-                    else
-                        break;
-                }
-            });
+            string response = await GetResponse("https://matchilling-chuck-norris-jokes-v1.p.rapidapi.com/jokes/categories");
+            categories = JsonConvert.DeserializeObject<List<string>>(response);
+            categoriesListBox.ItemsSource = categories;
             
         }
         #endregion
 
-        #region Получить ответ к запросу
-        private string GetResponse(string url)
+        #region Вывести рандомные шутки
+        private async void ShowRandomJokes()
         {
-            string response = "";
-            try
+            jokesCount = int.Parse(jokesCountTextBox.Text);
+
+            string response;
+
+            for (int i = 0; i < jokesCount; i++)
             {
-                HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create(url);
-                httpWebRequest.Accept = "application/json";
-                httpWebRequest.Headers["X-RapidAPI-Key"] = "a0ffdc746bmsh1d3fccdb8bdebd4p105957jsncf7f0f18ddad";
-                httpWebRequest.Headers["X-RapidAPI-Host"] = "matchilling-chuck-norris-jokes-v1.p.rapidapi.com";
-                httpWebRequest.Method = "GET";
-                HttpWebResponse httpWebResponse = (HttpWebResponse)httpWebRequest.GetResponse();
-                
-                using (StreamReader reader = new StreamReader(httpWebResponse.GetResponseStream()))
+                response = await GetResponse("https://matchilling-chuck-norris-jokes-v1.p.rapidapi.com/jokes/random");
+                if (response.Length > 0)
                 {
-                    response = reader.ReadToEnd();
+                    joke = JsonConvert.DeserializeObject<Result>(response);
+                    richTextBox.AppendText($"{i + 1}) {joke.Value}\n");
                 }
+                else
+                    break;
             }
-            catch (WebException exception)
+        }
+        #endregion
+
+        #region Получить ответ к запросу
+        private Task<string> GetResponse(string url)
+        {
+            return Task.Run(() =>
             {
-                MessageBox.Show(exception.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-            catch (Exception exception)
-            {
-                MessageBox.Show(exception.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-            return response;
+                string response = "";
+                try
+                {
+                    HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create(url);
+                    httpWebRequest.Accept = "application/json";
+                    httpWebRequest.Headers["X-RapidAPI-Key"] = "a0ffdc746bmsh1d3fccdb8bdebd4p105957jsncf7f0f18ddad";
+                    httpWebRequest.Headers["X-RapidAPI-Host"] = "matchilling-chuck-norris-jokes-v1.p.rapidapi.com";
+                    httpWebRequest.Method = "GET";
+                    HttpWebResponse httpWebResponse = (HttpWebResponse)httpWebRequest.GetResponse();
+
+                    using (StreamReader reader = new StreamReader(httpWebResponse.GetResponseStream()))
+                    {
+                        response = reader.ReadToEnd();
+                    }
+                }
+                catch (WebException exception)
+                {
+                    MessageBox.Show(exception.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                catch (Exception exception)
+                {
+                    MessageBox.Show(exception.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                return response;
+            });
         }
         #endregion
 
@@ -123,7 +114,7 @@ namespace ChuckNorris.WPF
         #endregion
 
         #region Двойной клик или нажатие Enter по категории
-        private void CategoriesListBox_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        private async void CategoriesListBox_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
             if(int.TryParse(jokesCountTextBox.Text, out jokesCount))
             {
@@ -132,23 +123,20 @@ namespace ChuckNorris.WPF
 
                 richTextBox.Document.Blocks.Clear();
 
-                Task.Factory.StartNew(() =>
-                {
-                    string response;
+                string response;
 
-                    for (int i = 0; i < jokesCount; i++)
+                for (int i = 0; i < jokesCount; i++)
+                {
+                    response = await GetResponse(url);
+                    if (response.Length > 0)
                     {
-                        response = GetResponse(url);
-                        if (response.Length > 0)
+                        joke = JsonConvert.DeserializeObject<Result>(response);
+                        Dispatcher.Invoke((Action)delegate
                         {
-                            joke = JsonConvert.DeserializeObject<Result>(response);
-                            Dispatcher.Invoke((Action)delegate
-                            {
-                                richTextBox.AppendText($"{i + 1}) {joke.Value} \n");
-                            });
-                        }
+                            richTextBox.AppendText($"{i + 1}) {joke.Value} \n");
+                        });
                     }
-                });
+                }
             }
             else
                 MessageBox.Show("Enter jokes count on page in numeric value", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -161,39 +149,33 @@ namespace ChuckNorris.WPF
         #endregion
 
         #region Нажатие Enter после ввода текстового запроса
-        private void SearchTextBox_KeyUp(object sender, KeyEventArgs e)
+        private async void SearchTextBox_KeyUp(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Enter && searchTextBox.Text.Length > 0)
             {
                 string url = "https://matchilling-chuck-norris-jokes-v1.p.rapidapi.com/jokes/search?query=" + searchTextBox.Text;
 
-                Task.Factory.StartNew(() =>
+                string response = await GetResponse(url);
+                var query = JsonConvert.DeserializeObject<Query>(response);
+
+                string jokes = "";
+                int counter = 0;
+                foreach (var joke in query.Result)
                 {
-                    string response = GetResponse(url);
-                    var query = JsonConvert.DeserializeObject<Query>(response);
+                    jokes += $"{++counter}) " + joke.Value + "\n";
+                }
 
-                    string jokes = "";
-                    int counter = 0;
-                    foreach (var joke in query.Result)
-                    {
-                        jokes += $"{++counter}) " + joke.Value + "\n";
-                    }
-
-                    Dispatcher.Invoke((Action)delegate
-                    {
-                        if (jokes.Length > 0)
-                        {
-                            richTextBox.Document.Blocks.Clear();
-                            richTextBox.AppendText(jokes);
-                        }
-                        else
-                        {
-                            MessageBox.Show("No matches found for current search", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
-                            searchTextBox.Text = "";
-                            return;
-                        }
-                    });
-                });
+                if (jokes.Length > 0)
+                {
+                    richTextBox.Document.Blocks.Clear();
+                    richTextBox.AppendText(jokes);
+                }
+                else
+                {
+                    MessageBox.Show("No matches found for current search", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                    searchTextBox.Text = "";
+                    return;
+                }
             }
         }
         #endregion
